@@ -22,10 +22,12 @@ func main() {
 		panic(err)
 	}
 
+	deploymentName := "webserver"
+	nameSpace := "default"
 	k8sDeployment.List(*client, apiv1.NamespaceAll)
-	k8sDeployment.PerformDeployment(*client, "default", "server-backend", "echo", "hub.dckr.ir/library/nginx:1.23", 1)
-	k8sDeployment.Scale(*client, "server-backend-deployment", "default", 5)
-	// k8sDeployment.ChangeImage(*client, "server-backend-deployment", "default", "nginx:latest")
-	// k8sDeployment.Delete(*client, "server-backend-deployment", "default")
+	k8sDeployment.PerformDeployment(*client, nameSpace, deploymentName, "nginx:1.17.9", 1)
+	k8sDeployment.Scale(*client, nameSpace, deploymentName, 5)
+	k8sDeployment.ChangeImage(*client, nameSpace, deploymentName, "nginx:latest")
+	k8sDeployment.Delete(*client, nameSpace, deploymentName)
 
 }

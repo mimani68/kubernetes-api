@@ -20,7 +20,7 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
-func PerformDeployment(client kubernetes.Clientset, namespace, appName, podName, image string, replica int) {
+func PerformDeployment(client kubernetes.Clientset, namespace, appName, image string, replica int) {
 	if namespace == "" {
 		namespace = apiv1.NamespaceDefault
 	}
