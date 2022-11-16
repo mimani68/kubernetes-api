@@ -1,9 +1,10 @@
-package k8s
+package deployment
 
 import (
 	"context"
 	"fmt"
 
+	"app.io/pkg/k8s"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +20,7 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
-func DeploymentApp(client kubernetes.Clientset, namespace, appName, podName, image string, replica int) {
+func PerformDeployment(client kubernetes.Clientset, namespace, appName, podName, image string, replica int) {
 	if namespace == "" {
 		namespace = apiv1.NamespaceDefault
 	}
@@ -27,10 +28,10 @@ func DeploymentApp(client kubernetes.Clientset, namespace, appName, podName, ima
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: appName + "-deployment",
+			Name: appName,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: int32Ptr(int32(replica)),
+			Replicas: k8s.Int32Ptr(replica),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": appName,
@@ -69,22 +70,13 @@ func DeploymentApp(client kubernetes.Clientset, namespace, appName, podName, ima
 	fmt.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())
 }
 
-func DeploymentUpdate(client kubernetes.Clientset, namespace string) {
+func update(client kubernetes.Clientset, namespace, deploymentName string, newResource *appsv1.Deployment) {
 	if namespace == "" {
 		namespace = apiv1.NamespaceDefault
 	}
 	deploymentsClient := client.AppsV1().Deployments(namespace)
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Retrieve the latest version of Deployment before attempting update
-		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		result, getErr := deploymentsClient.Get(context.TODO(), "demo-deployment", metav1.GetOptions{})
-		if getErr != nil {
-			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
-		}
-
-		result.Spec.Replicas = int32Ptr(1)                           // reduce replica count
-		result.Spec.Template.Spec.Containers[0].Image = "nginx:1.13" // change nginx version
-		_, updateErr := deploymentsClient.Update(context.TODO(), result, metav1.UpdateOptions{})
+		_, updateErr := deploymentsClient.Update(context.TODO(), newResource, metav1.UpdateOptions{})
 		return updateErr
 	})
 	if retryErr != nil {
@@ -93,13 +85,33 @@ func DeploymentUpdate(client kubernetes.Clientset, namespace string) {
 	fmt.Println("Updated deployment...")
 }
 
-func DeploymentDelete(client kubernetes.Clientset, namespace string) {
+func Scale(client kubernetes.Clientset, namespace, deploymentName string, number int) {
+	deploymentsClient := client.AppsV1().Deployments(namespace)
+	updatedResource, getErr := deploymentsClient.Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if getErr != nil {
+		panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
+	}
+	updatedResource.Spec.Replicas = k8s.Int32Ptr(number)
+	update(client, namespace, deploymentName, updatedResource)
+}
+
+func ChangeImage(client kubernetes.Clientset, namespace, deploymentName string, imageTag string) {
+	deploymentsClient := client.AppsV1().Deployments(namespace)
+	updatedResource, getErr := deploymentsClient.Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if getErr != nil {
+		panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
+	}
+	updatedResource.Spec.Template.Spec.Containers[0].Image = imageTag
+	update(client, namespace, deploymentName, updatedResource)
+}
+
+func Delete(client kubernetes.Clientset, namespace, deploymentName string) {
 	if namespace == "" {
 		namespace = apiv1.NamespaceDefault
 	}
 	deploymentsClient := client.AppsV1().Deployments(namespace)
 	deletePolicy := metav1.DeletePropagationForeground
-	if err := deploymentsClient.Delete(context.TODO(), "demo-deployment", metav1.DeleteOptions{
+	if err := deploymentsClient.Delete(context.TODO(), deploymentName, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
 		panic(err)
@@ -107,7 +119,7 @@ func DeploymentDelete(client kubernetes.Clientset, namespace string) {
 	fmt.Println("Deleted deployment.")
 }
 
-func DeploymentList(client kubernetes.Clientset, namespace string) {
+func List(client kubernetes.Clientset, namespace string) {
 	if namespace == "" {
 		namespace = apiv1.NamespaceAll
 	}

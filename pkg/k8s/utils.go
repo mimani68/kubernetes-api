@@ -1,3 +1,7 @@
 package k8s
 
-func int32Ptr(i int32) *int32 { return &i }
+func Int32Ptr(i int) *int32 {
+	scale := new(int32)
+	*scale = int32(i)
+	return scale
+}
